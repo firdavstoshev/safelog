@@ -1,0 +1,29 @@
+# JetBrains IDEs
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+
+# Go test & profile artefacts
+*.test
+*.pprof
+*.prof
+coverage.out
+coverage.html
+
+# Claude Code artefacts
+.claude/
+CLAUDE.md
+
+# Build output
+bin/
+dist/
+
+# Editor swap/temp
+*.swp
+*.swo
+*~

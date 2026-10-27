@@ -1,0 +1,5 @@
+rules:
+  - name: print_name
+    keys: [ print_name, printName ]
+    strategy: replace
+    replacement: "***"
