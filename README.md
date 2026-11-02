@@ -116,7 +116,66 @@ log := safelog.New(os.Stdout, masker.New(rules))
 | `initials`        | —                               | `IVANOV IVAN SERGEEVICH` → `I.I.S.`           |
 | `fingerprint_pan` | —                               | `5058600012346210` → `BIN=505860\|L4=6210`    |
 | `mask_ipv4`       | `prefix`                        | `192.168.1.4:8080` → `192.168.x.x:8080`       |
+| `mask_url_components` | —                           | mask host/path/fragment by regex and query values by key/regex |
 | `mask_url`        | —                               | `https://api/path?token=X` → `https://api/***`|
+
+### Full URLs with IP hosts and query parameters
+
+`MaskURL` (and `Event.MaskedURL`) masks the host, path and fragment
+using configured value-regex rules, and decoded query values using
+key-based rules first, then value-regex rules. It accepts full and relative URLs.
+`MaskQuery` / `MaskedQuery` mask only query parameters, preserving all other
+URL components verbatim. They also accept bare queries such as
+`password=secret&amount=100`.
+IP masking is opt-in; it is not included in `DefaultRules()`.
+
+For URL fields inside JSON/XML or `MaskAny`, use `mask_url_components`:
+
+```yaml
+rules:
+  - name: request_url
+    keys: [requestUrl, callbackUrl]
+    strategy: mask_url_components
+
+  - name: ip
+    pattern: '\b(?:\d{1,3}\.){3}\d{1,3}(?::\d{1,5})?\b'
+    strategy: mask_ipv4
+    prefix: 2
+```
+
+Append these rules to `DefaultRules()` to retain password, PAN and other
+parameter rules. `Load` returns only the rules in the YAML; it does not
+merge defaults automatically.
+
+With that configuration, both `MaskedURL` and a JSON `requestUrl` field
+transform:
+
+```text
+http://192.168.1.4:8080/charge?password=secret&amount=100
+→ http://192.168.x.x:8080/charge?amount=100&password=%2A%2A%2A
+```
+
+`%2A` is an encoded `*`. URL credentials are replaced with `***`.
+Malformed URLs are replaced with `***`; malformed queries are replaced
+in full while retaining the masked URL's other components.
+`MaskQuery` retains its regex fallback for plain text without URL/query
+structure.
+
+In Go, use `Rule{Keys: []string{"requestUrl"}, URLComponents: true}` or
+call `m.MaskURL([]byte(rawURL))` directly. A component rule can also
+use `Pattern: masker.URLRegex` to detect URLs in plain text. Component
+processing skips URL-component regex rules to avoid recursively applying
+the same strategy; ordinary regex rules still apply.
+
+The existing `mask_url` strategy continues to discard the path, query
+and fragment while preserving the host. Use it when those components
+should be removed entirely.
+
+Run the dedicated example (including its embedded YAML configuration):
+
+```bash
+go run ./example/url
+```
 
 ## API
 
@@ -180,7 +239,8 @@ Run the service-owned context key example with `go run ./example/hooks`.
 (*Event).Err(err error)          *Event
 (*Event).MaskedJSON(k string, payload []byte) *Event
 (*Event).MaskedXML (k string, payload []byte) *Event
-(*Event).MaskedQuery(k string, raw []byte) *Event   // URL / query string
+(*Event).MaskedQuery(k string, raw []byte) *Event   // query parameters only
+(*Event).MaskedURL(k string, raw []byte) *Event     // complete URL
 (*Event).MaskedString(k, v string) *Event
 (*Event).MaskedAny(k string, v any) *Event
 (*Event).Msg(msg string)
@@ -197,7 +257,8 @@ masker.LoadFile(path string) ([]Rule, error)
 
 (*Masker).MaskJSON(raw []byte) []byte      // preserves field order
 (*Masker).MaskXML (raw []byte) []byte
-(*Masker).MaskQuery(raw []byte) []byte     // URL/query, key-based + regex
+(*Masker).MaskQuery(raw []byte) []byte     // query parameters only
+(*Masker).MaskURL(raw []byte) []byte       // all URL components using configured rules
 (*Masker).MaskString(s string) string      // value-regex only
 (*Masker).MaskAny(v any) any
 ```

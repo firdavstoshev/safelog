@@ -1,0 +1,9 @@
+rules:
+  - name: request_url
+    keys: [requestUrl, callbackUrl]
+    strategy: mask_url_components
+
+  - name: ip
+    pattern: '\b(?:\d{1,3}\.){3}\d{1,3}(?::\d{1,5})?\b'
+    strategy: mask_ipv4
+    prefix: 2

@@ -142,9 +142,16 @@ func (e *Event) MaskedString(key, v string) *Event {
 // MaskedQuery masks a URL or raw query string. Parameters whose names
 // match a configured rule are masked by key (test cards with invalid
 // Luhn are still caught). Values of unknown parameters fall through to
-// value-regex rules.
+// value-regex rules. Components outside the query are preserved.
 func (e *Event) MaskedQuery(key string, raw []byte) *Event {
 	e.e = e.e.Str(key, string(e.m.MaskQuery(raw)))
+	return e
+}
+
+// MaskedURL masks all components of an absolute or relative URL using the
+// configured host/path/fragment regex rules and query key/value rules.
+func (e *Event) MaskedURL(key string, raw []byte) *Event {
+	e.e = e.e.Str(key, string(e.m.MaskURL(raw)))
 	return e
 }
 

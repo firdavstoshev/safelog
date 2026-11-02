@@ -1,35 +1,39 @@
 package masker
 
 import (
-	"bytes"
 	"net/url"
+	"strings"
 )
 
-// MaskQuery masks a URL query string (or a full URL that contains one).
-// For each parameter the key is checked against the configured rules;
-// if a key-based rule matches, its MaskFunc is applied directly (Luhn
-// check is skipped because the key itself already identifies PII).
-// Otherwise the value is passed through value-regex rules.
-//
-// If raw does not contain '?', it is treated as plain text and returned
-// through MaskString — this keeps the function safe to use on arbitrary
-// URL-like strings without the caller needing to know their shape.
-//
-// Parse errors fall back to MaskString as well, so the function never
-// swallows PII silently on malformed input.
+// MaskQuery masks query parameters in a full/relative URL or a bare query
+// string. All URL components outside the query are preserved verbatim. Query
+// keys are sorted on output. Malformed queries are replaced in full with "***".
+// Plain text without URL/query structure retains the legacy regex fallback.
 func (m *Masker) MaskQuery(raw []byte) []byte {
-	q := bytes.IndexByte(raw, '?')
-	if q < 0 {
-		return []byte(m.MaskString(string(raw)))
+	s := string(raw)
+	// A fragment is not part of a URL's query. Keep it byte-for-byte.
+	end := len(s)
+	if i := strings.IndexByte(s, '#'); i >= 0 {
+		end = i
 	}
-	prefix := raw[:q+1]
-	query := string(raw[q+1:])
+	if q := strings.IndexByte(s[:end], '?'); q >= 0 {
+		return []byte(s[:q+1] + m.maskQueryValues(s[q+1:end]) + s[end:])
+	}
+	// Bare queries have a parameter separator before any URL structure.
+	if i := strings.IndexAny(s, "=&"); i >= 0 && !strings.ContainsAny(s[:i], "/:#") {
+		return []byte(m.maskQueryValues(s))
+	}
+	if strings.ContainsAny(s, "/#") {
+		return raw
+	}
+	return []byte(m.MaskString(s))
+}
 
+func (m *Masker) maskQueryValues(query string) string {
 	values, err := url.ParseQuery(query)
 	if err != nil {
-		return []byte(m.MaskString(string(raw)))
+		return "***"
 	}
-
 	for k, vs := range values {
 		fn := m.maskByKey(k)
 		for i, v := range vs {
@@ -39,14 +43,6 @@ func (m *Masker) MaskQuery(raw []byte) []byte {
 				vs[i] = m.applyValueRules(v)
 			}
 		}
-		values[k] = vs
 	}
-
-	buf := getBuf()
-	defer putBuf(buf)
-	buf.Write(prefix)
-	buf.WriteString(values.Encode())
-	out := make([]byte, buf.Len())
-	copy(out, buf.Bytes())
-	return out
+	return values.Encode()
 }

@@ -17,6 +17,9 @@ type Rule struct {
 	Pattern   *regexp.Regexp
 	LuhnCheck bool
 	Mask      MaskFunc
+	// URLComponents selects URL-aware masking using this Masker's rules.
+	// When true, Mask is ignored.
+	URLComponents bool
 }
 
 // Masker applies a set of rules to JSON or XML payloads.
@@ -30,6 +33,9 @@ type Masker struct {
 func New(rules []Rule) *Masker {
 	m := &Masker{rules: rules, byKey: make(map[string]MaskFunc)}
 	for _, r := range rules {
+		if r.URLComponents {
+			r.Mask = m.maskURL
+		}
 		for _, k := range r.Keys {
 			m.byKey[strings.ToLower(k)] = r.Mask
 		}
@@ -78,10 +84,21 @@ func isLowerASCII(s string) bool {
 	return true
 }
 
-// applyValueRules runs every value-pattern rule against s. The first matching
-// rule wins; the input is returned unchanged if no rule matches.
+// applyValueRules runs every value-pattern rule against s.
+// Rules run in registration order; the input is unchanged if none match.
 func (m *Masker) applyValueRules(s string) string {
+	return m.applyPatterns(s, false)
+}
+
+func (m *Masker) applyComponentRules(s string) string {
+	return m.applyPatterns(s, true)
+}
+
+func (m *Masker) applyPatterns(s string, component bool) string {
 	for _, r := range m.byValue {
+		if component && r.URLComponents {
+			continue
+		}
 		s = r.Pattern.ReplaceAllStringFunc(s, func(match string) string {
 			if r.LuhnCheck {
 				clean := stripNonDigits(match)

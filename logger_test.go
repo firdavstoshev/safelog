@@ -133,3 +133,31 @@ func TestRequestIDFromContext(t *testing.T) {
 		t.Fatalf("want abc, got %q", got)
 	}
 }
+
+func TestEvent_MaskedURL_IPAndPassword(t *testing.T) {
+	var buf bytes.Buffer
+	rules := append(masker.DefaultRules(), masker.Rule{Pattern: masker.IPv4Regex, Mask: masker.MaskIPv4(2)})
+	log := New(&buf, masker.New(rules))
+	log.Info().MaskedURL("url", []byte("http://192.168.1.4:8080/charge?password=secret&amount=100")).Msg("request")
+	var got map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if want := "http://192.168.x.x:8080/charge?amount=100&password=%2A%2A%2A"; got["url"] != want {
+		t.Fatalf("got %q, want %q", got["url"], want)
+	}
+}
+
+func TestEvent_MaskedQuery_PreservesHost(t *testing.T) {
+	var buf bytes.Buffer
+	rules := append(masker.DefaultRules(), masker.Rule{Pattern: masker.IPv4Regex, Mask: masker.MaskIPv4(2)})
+	log := New(&buf, masker.New(rules))
+	log.Info().MaskedQuery("url", []byte("http://192.168.1.4:8080/charge?password=secret")).Msg("request")
+	var got map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if want := "http://192.168.1.4:8080/charge?password=%2A%2A%2A"; got["url"] != want {
+		t.Fatalf("got %q, want %q", got["url"], want)
+	}
+}
