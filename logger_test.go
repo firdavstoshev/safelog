@@ -10,13 +10,13 @@ import (
 	"github.com/firdavstoshev/safelog/masker"
 )
 
-func newTestLogger() (*Logger, *bytes.Buffer) {
+func newTestLogger(opts ...Option) (*Logger, *bytes.Buffer) {
 	buf := &bytes.Buffer{}
-	return New(buf, masker.New(masker.DefaultRules())), buf
+	return New(buf, masker.New(masker.DefaultRules()), opts...), buf
 }
 
 func TestEvent_Ctx_AttachesRequestID(t *testing.T) {
-	log, buf := newTestLogger()
+	log, buf := newTestLogger(WithHook(RequestIDHook{}))
 	ctx := ContextWithRequestID(context.Background(), "req-ctx-1")
 
 	log.Info().Ctx(ctx).Str("partner", "visa").Msg("ok")
@@ -34,7 +34,7 @@ func TestEvent_Ctx_AttachesRequestID(t *testing.T) {
 }
 
 func TestEvent_Ctx_NilIsNoop(t *testing.T) {
-	log, buf := newTestLogger()
+	log, buf := newTestLogger(WithHook(RequestIDHook{}))
 	log.Info().Ctx(nil).Str("k", "v").Msg("ok")
 	if strings.Contains(buf.String(), "X-Request-ID") {
 		t.Fatalf("unexpected reqID in: %s", buf.String())
@@ -42,7 +42,7 @@ func TestEvent_Ctx_NilIsNoop(t *testing.T) {
 }
 
 func TestEvent_Ctx_WithoutReqIDIsNoop(t *testing.T) {
-	log, buf := newTestLogger()
+	log, buf := newTestLogger(WithHook(RequestIDHook{}))
 	log.Info().Ctx(context.Background()).Str("k", "v").Msg("ok")
 	if strings.Contains(buf.String(), "X-Request-ID") {
 		t.Fatalf("unexpected reqID in: %s", buf.String())
@@ -50,7 +50,7 @@ func TestEvent_Ctx_WithoutReqIDIsNoop(t *testing.T) {
 }
 
 func TestEvent_MaskedJSON_WithCtx(t *testing.T) {
-	log, buf := newTestLogger()
+	log, buf := newTestLogger(WithHook(RequestIDHook{}))
 	ctx := ContextWithRequestID(context.Background(), "req-ctx-2")
 
 	log.Info().Ctx(ctx).
