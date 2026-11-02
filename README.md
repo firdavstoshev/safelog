@@ -123,7 +123,8 @@ log := safelog.New(os.Stdout, masker.New(rules))
 ### `safelog`
 
 ```go
-safelog.New(w io.Writer, m *masker.Masker) *Logger
+safelog.New(w io.Writer, m *masker.Masker, opts ...safelog.Option) *Logger
+safelog.WithHook(hook zerolog.Hook) safelog.Option
 safelog.ContextWithRequestID(ctx context.Context, reqID string) context.Context
 safelog.RequestIDFromContext(ctx context.Context) string
 
@@ -135,11 +136,45 @@ safelog.RequestIDFromContext(ctx context.Context) string
 (*Logger).Debug() *Event
 ```
 
+### Context and hooks
+
+`Ctx` forwards the context to zerolog so hooks can access it through
+`Event.GetCtx()`. Request-ID extraction is opt-in:
+
+```go
+log := safelog.New(os.Stdout, masker.New(masker.DefaultRules()),
+    safelog.WithHook(safelog.RequestIDHook{}),
+)
+ctx := safelog.ContextWithRequestID(context.Background(), "req-42")
+log.Info().Ctx(ctx).Msg("request received")
+```
+
+The default `RequestIDHook` uses `safelog.RequestIDFromContext`. To use your
+middleware's existing context key, supply its accessor instead:
+
+```go
+safelog.WithHook(safelog.RequestIDHook{Extract: middlewareRequestID})
+```
+
+Any `zerolog.Hook` can be registered with `WithHook`; multiple hooks run in
+registration order. Hooks must be safe for concurrent calls, and fields they
+add are emitted verbatim without masking. Events without a context expose
+`context.Background()` to hooks. Request-ID hooks omit empty IDs.
+
+Use one writer for `X-Request-ID`: do not combine `RequestIDHook` with
+`WithRequestID` or another hook writing that field, as zerolog emits duplicate
+keys. `WithRequestID` continues to work without a hook.
+
+**Migration:** code that previously relied on `Ctx` automatically reading
+safelog's private request-ID key must register `WithHook(RequestIDHook{})`.
+
+Run the service-owned context key example with `go run ./example/hooks`.
+
 ### `Event`
 
 ```go
 (*Event).WithRequestID(reqID string) *Event   // adds X-Request-ID
-(*Event).Ctx(ctx context.Context) *Event      // pulls reqID from context
+(*Event).Ctx(ctx context.Context) *Event      // supplies context to hooks
 (*Event).Str(k, v string)        *Event   // passthrough — no masking
 (*Event).Int(k string, v int)    *Event
 (*Event).Err(err error)          *Event
@@ -259,8 +294,8 @@ keep the previous instance on reload error.
 
 ## TODO
 
-- **OpenTelemetry correlation.** Pull `trace_id` / `span_id` from
-  `context.Context` in `(*Event).Ctx(ctx)` alongside `X-Request-ID`.
+- **OpenTelemetry correlation.** Add a hook extracting `trace_id` / `span_id`
+  from the context supplied through `(*Event).Ctx(ctx)`.
 - **Sampling / rate limiting.** Delegate to zerolog `.Sample(...)`, or
   add a convenience wrapper for high-volume endpoints.
 - **JSONPath / dotted keys.** Rule targeting like `client.phone` or

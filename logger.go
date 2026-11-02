@@ -36,7 +36,7 @@ type Logger struct {
 // New builds a Logger that writes to w and masks with m. The underlying
 // zerolog uses RFC3339Nano timestamps and includes the caller for Error
 // level and above.
-func New(w io.Writer, m *masker.Masker) *Logger {
+func New(w io.Writer, m *masker.Masker, opts ...Option) *Logger {
 	if w == nil {
 		w = os.Stdout
 	}
@@ -44,6 +44,9 @@ func New(w io.Writer, m *masker.Masker) *Logger {
 	z := zerolog.New(w).With().Timestamp().Logger()
 	l := &Logger{z: z}
 	l.m.Store(m)
+	for _, opt := range opts {
+		opt(l)
+	}
 	return l
 }
 
@@ -99,15 +102,13 @@ func (e *Event) WithRequestID(reqID string) *Event {
 	return e
 }
 
-// Ctx extracts correlation fields from ctx (currently X-Request-ID) and
-// attaches them to the event. No-op if ctx is nil or carries no reqID.
-// Preferred form when a request context is already in scope:
+// Ctx attaches ctx to the underlying zerolog event for hooks to inspect via
+// GetCtx. Request-ID extraction requires WithHook(RequestIDHook{}), or a
+// service-provided hook. Passing nil clears any previously attached context.
 //
 //	log.Info().Ctx(ctx).Str("partner", "visa").Msg("...")
 func (e *Event) Ctx(ctx context.Context) *Event {
-	if reqID := RequestIDFromContext(ctx); reqID != "" {
-		e.e = e.e.Str(requestIDKey, reqID)
-	}
+	e.e = e.e.Ctx(ctx)
 	return e
 }
 
