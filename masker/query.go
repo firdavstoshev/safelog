@@ -7,12 +7,19 @@ import (
 
 // MaskQuery masks query parameters in a full/relative URL or a bare query
 // string. All URL components outside the query are preserved verbatim. Query
-// keys are sorted on output. Malformed queries are replaced in full with "***".
+// keys are sorted on output. Malformed queries and inputs ambiguous between
+// bare queries and relative URLs are replaced in full with "***".
 // Plain text without URL/query structure retains the legacy regex fallback.
 func (m *Masker) MaskQuery(raw []byte) []byte {
 	s := string(raw)
 	// Bare queries have a parameter separator before any URL structure.
 	if i := strings.IndexAny(s, "=&"); i >= 0 && !strings.ContainsAny(s[:i], "/:#?") {
+		// A raw '?' after a parameter separator can instead delimit a
+		// relative URL whose path contains '='. Neither interpretation is
+		// safe to prefer: each can hide a sensitive key from the other.
+		if strings.Contains(s, "?") {
+			return []byte("***")
+		}
 		return []byte(m.maskQueryValues(s))
 	}
 	// A fragment is not part of a URL's query. Keep it byte-for-byte.

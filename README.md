@@ -126,7 +126,11 @@ using configured value-regex rules, and decoded query values using
 key-based rules first, then value-regex rules. It accepts full and relative URLs.
 `MaskQuery` / `MaskedQuery` mask only query parameters, preserving all other
 URL components verbatim. They also accept bare queries such as
-`password=secret&amount=100`.
+`password=secret&amount=100`. Inputs such as
+`action=pay/path?password=secret` or `password=secret?next=1` are ambiguous
+between a bare query and a relative URL, so `MaskQuery` redacts them entirely
+as `***`. Use a leading `/` for relative URLs, percent-encode `?` inside
+bare-query values, or use `MaskURL` when the input is known to be a URL.
 IP masking is opt-in; it is not included in `DefaultRules()`.
 
 For URL fields inside JSON/XML or `MaskAny`, use `mask_url_components`:

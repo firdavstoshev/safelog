@@ -15,7 +15,7 @@ func TestMaskQueryBareValueContainingURLDelimiters(t *testing.T) {
 		"password=http://a/path?next=1&amount=100",
 	} {
 		got := string(m.MaskQuery([]byte(input)))
-		if strings.Contains(got, "secret") || strings.Contains(got, "http") || !strings.Contains(got, "password=%2A%2A%2A") {
+		if got != "***" {
 			t.Errorf("MaskQuery(%q) = %q: sensitive bare-query value was not replaced", input, got)
 		}
 	}
@@ -93,5 +93,29 @@ func TestNestedURLBudgetBoundary(t *testing.T) {
 				t.Fatalf("shallow nested URL not masked: %s", got)
 			}
 		}
+	}
+}
+
+func TestMaskQueryAmbiguousRelativeURL(t *testing.T) {
+	m := newDefault()
+	for _, input := range []string{
+		"action=pay/path?password=secret",
+		"action=pay/path?password=secret#section",
+		"action=pay?password=secret",
+		"action=pay/path?password=%73ecret",
+	} {
+		if got := string(m.MaskQuery([]byte(input))); got != "***" {
+			t.Errorf("ambiguous input %q: got %q, want full redaction", input, got)
+		}
+	}
+	// A leading slash disambiguates the URL and preserves its path.
+	input := "/action=pay/path?password=secret"
+	if got := string(m.MaskQuery([]byte(input))); got != "/action=pay/path?password=%2A%2A%2A" {
+		t.Fatal(got)
+	}
+	// Encoding the delimiter disambiguates a bare query value.
+	input = "action=pay%2Fpath%3Fnext%3D1&password=secret"
+	if got := string(m.MaskQuery([]byte(input))); got != "action=pay%2Fpath%3Fnext%3D1&password=%2A%2A%2A" {
+		t.Fatal(got)
 	}
 }
