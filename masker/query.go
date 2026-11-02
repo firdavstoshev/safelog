@@ -11,6 +11,10 @@ import (
 // Plain text without URL/query structure retains the legacy regex fallback.
 func (m *Masker) MaskQuery(raw []byte) []byte {
 	s := string(raw)
+	// Bare queries have a parameter separator before any URL structure.
+	if i := strings.IndexAny(s, "=&"); i >= 0 && !strings.ContainsAny(s[:i], "/:#?") {
+		return []byte(m.maskQueryValues(s))
+	}
 	// A fragment is not part of a URL's query. Keep it byte-for-byte.
 	end := len(s)
 	if i := strings.IndexByte(s, '#'); i >= 0 {
@@ -19,10 +23,6 @@ func (m *Masker) MaskQuery(raw []byte) []byte {
 	if q := strings.IndexByte(s[:end], '?'); q >= 0 {
 		return []byte(s[:q+1] + m.maskQueryValues(s[q+1:end]) + s[end:])
 	}
-	// Bare queries have a parameter separator before any URL structure.
-	if i := strings.IndexAny(s, "=&"); i >= 0 && !strings.ContainsAny(s[:i], "/:#") {
-		return []byte(m.maskQueryValues(s))
-	}
 	if strings.ContainsAny(s, "/#") {
 		return raw
 	}
@@ -30,17 +30,21 @@ func (m *Masker) MaskQuery(raw []byte) []byte {
 }
 
 func (m *Masker) maskQueryValues(query string) string {
+	return m.maskQueryValuesDepth(query, maxURLMaskDepth)
+}
+
+func (m *Masker) maskQueryValuesDepth(query string, remaining int) string {
 	values, err := url.ParseQuery(query)
 	if err != nil {
 		return "***"
 	}
 	for k, vs := range values {
-		fn := m.maskByKey(k)
+		fn := m.maskByKeyDepth(k, remaining)
 		for i, v := range vs {
 			if fn != nil {
 				vs[i] = fn(v)
 			} else {
-				vs[i] = m.applyValueRules(v)
+				vs[i] = m.applyPatterns(v, false, remaining)
 			}
 		}
 	}

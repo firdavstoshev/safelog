@@ -22,22 +22,27 @@ type Rule struct {
 	URLComponents bool
 }
 
+type keyRule struct {
+	mask          MaskFunc
+	urlComponents bool
+}
+
 // Masker applies a set of rules to JSON or XML payloads.
 type Masker struct {
 	rules   []Rule
-	byKey   map[string]MaskFunc // lower-cased key -> mask
-	byValue []Rule              // rules with Pattern set
+	byKey   map[string]keyRule // lower-cased key -> rule
+	byValue []Rule             // rules with Pattern set
 }
 
 // New builds a Masker from the given rules.
 func New(rules []Rule) *Masker {
-	m := &Masker{rules: rules, byKey: make(map[string]MaskFunc)}
+	m := &Masker{rules: rules, byKey: make(map[string]keyRule)}
 	for _, r := range rules {
 		if r.URLComponents {
 			r.Mask = m.maskURL
 		}
 		for _, k := range r.Keys {
-			m.byKey[strings.ToLower(k)] = r.Mask
+			m.byKey[strings.ToLower(k)] = keyRule{mask: r.Mask, urlComponents: r.URLComponents}
 		}
 		if r.Pattern != nil {
 			m.byValue = append(m.byValue, r)
@@ -52,12 +57,16 @@ func New(rules []Rule) *Masker {
 // and relies on the Go compiler's `m[string(buf)]` optimisation to avoid
 // a string allocation during the map lookup.
 func (m *Masker) maskByKey(key string) MaskFunc {
+	return m.maskByKeyDepth(key, maxURLMaskDepth)
+}
+
+func (m *Masker) maskByKeyDepth(key string, remaining int) MaskFunc {
 	if len(key) == 0 || len(m.byKey) == 0 {
 		return nil
 	}
 	// Fast path: key is already lowercase ASCII → direct lookup, no alloc.
 	if isLowerASCII(key) {
-		return m.byKey[key]
+		return m.byKey[key].withDepth(m, remaining)
 	}
 	var buf [64]byte
 	if len(key) <= len(buf) {
@@ -68,10 +77,19 @@ func (m *Masker) maskByKey(key string) MaskFunc {
 			}
 			buf[i] = c
 		}
-		return m.byKey[string(buf[:len(key)])]
+		return m.byKey[string(buf[:len(key)])].withDepth(m, remaining)
 	}
 	// Fallback for keys longer than 64 bytes — rare in practice.
-	return m.byKey[strings.ToLower(key)]
+	return m.byKey[strings.ToLower(key)].withDepth(m, remaining)
+}
+
+// withDepth preserves the caller's remaining budget instead of invoking the
+// top-level maskURL wrapper, which would reset it for every query parameter.
+func (r keyRule) withDepth(m *Masker, remaining int) MaskFunc {
+	if r.urlComponents {
+		return func(v string) string { return m.maskURLDepth(v, remaining) }
+	}
+	return r.mask
 }
 
 func isLowerASCII(s string) bool {
@@ -87,14 +105,14 @@ func isLowerASCII(s string) bool {
 // applyValueRules runs every value-pattern rule against s.
 // Rules run in registration order; the input is unchanged if none match.
 func (m *Masker) applyValueRules(s string) string {
-	return m.applyPatterns(s, false)
+	return m.applyPatterns(s, false, maxURLMaskDepth)
 }
 
 func (m *Masker) applyComponentRules(s string) string {
-	return m.applyPatterns(s, true)
+	return m.applyPatterns(s, true, maxURLMaskDepth)
 }
 
-func (m *Masker) applyPatterns(s string, component bool) string {
+func (m *Masker) applyPatterns(s string, component bool, remaining int) string {
 	for _, r := range m.byValue {
 		if component && r.URLComponents {
 			continue
@@ -105,7 +123,10 @@ func (m *Masker) applyPatterns(s string, component bool) string {
 				if !Luhn(clean) {
 					return match
 				}
-				return r.Mask(clean)
+				match = clean
+			}
+			if r.URLComponents {
+				return m.maskURLDepth(match, remaining)
 			}
 			return r.Mask(match)
 		})

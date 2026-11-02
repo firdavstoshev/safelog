@@ -165,7 +165,9 @@ In Go, use `Rule{Keys: []string{"requestUrl"}, URLComponents: true}` or
 call `m.MaskURL([]byte(rawURL))` directly. A component rule can also
 use `Pattern: masker.URLRegex` to detect URLs in plain text. Component
 processing skips URL-component regex rules to avoid recursively applying
-the same strategy; ordinary regex rules still apply.
+the same strategy; ordinary regex rules still apply. Nested URLs share a
+depth limit of eight URL levels; any remaining nested URL is replaced with
+`***` when the limit is reached.
 
 The existing `mask_url` strategy continues to discard the path, query
 and fragment while preserving the host. Use it when those components
