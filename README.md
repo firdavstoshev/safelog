@@ -183,7 +183,9 @@ The existing `mask_url` strategy continues to discard the path, query
 and fragment while preserving the host. Use it when those components
 should be removed entirely.
 
-Run the dedicated example (including its embedded YAML configuration):
+Run the dedicated example (including its embedded YAML configuration).
+It also detects URLs inside plain text by pattern and compares
+`mask_url_components`, `mask_url`, and `replace`:
 
 ```bash
 go run ./example/url

@@ -1,5 +1,6 @@
 // Example: mask IP/domain hosts and query parameters together, both directly
-// and inside JSON fields configured with mask_url_components.
+// inside JSON fields, and by pattern inside plain text. Also compares the
+// mask_url and replace strategies.
 //
 // Run with: go run ./example/url
 package main
@@ -36,4 +37,21 @@ func main() {
 	// Bare queries also use parameter-name rules, without a leading '?'.
 	log.Info().MaskedQuery("query", []byte("password=secret&amount=100")).
 		Msg("query parameters")
+
+	// The YAML URL pattern finds URLs inside text without a matching field key.
+	text := "calling https://api.example.com/charge?password=secret&amount=100 and http://192.168.1.4:8080/charge?password=secret"
+	log.Info().MaskedString("text", text).
+		Msg("URL pattern with mask_url_components")
+
+	// Alternative strategies use separate maskers so they do not stack.
+	// mask_url preserves the host and removes the entire path/query/fragment.
+	stripped := masker.New([]masker.Rule{{Pattern: masker.URLRegex, Mask: masker.MaskURL()}})
+	safelog.New(os.Stdout, stripped).Info().MaskedString("text", text).
+		Msg("URL pattern with mask_url")
+
+	// replace hides each whole URL, preserving the surrounding text.
+	replaced := masker.New([]masker.Rule{{Pattern: masker.URLRegex, Mask: masker.Replace("***")}})
+	safelog.New(os.Stdout, replaced).Info().MaskedString("text", text).
+		Msg("URL pattern with replace")
+
 }
