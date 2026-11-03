@@ -116,14 +116,15 @@ log := safelog.New(os.Stdout, masker.New(rules))
 | `initials`        | —                               | `IVANOV IVAN SERGEEVICH` → `I.I.S.`           |
 | `fingerprint_pan` | —                               | `5058600012346210` → `BIN=505860\|L4=6210`    |
 | `mask_ipv4`       | `prefix`                        | `192.168.1.4:8080` → `192.168.x.x:8080`       |
-| `mask_url_components` | —                           | mask host/path/fragment by regex and query values by key/regex |
+| `mask_url_components` | —                           | hide domain hosts; mask IP/path/fragment by regex and query values by key/regex |
 | `mask_url`        | —                               | `https://api/path?token=X` → `https://api/***`|
 
-### Full URLs with IP hosts and query parameters
+### Full URLs with domain/IP hosts and query parameters
 
-`MaskURL` (and `Event.MaskedURL`) masks the host, path and fragment
-using configured value-regex rules, and decoded query values using
-key-based rules first, then value-regex rules. It accepts full and relative URLs.
+`MaskURL` (and `Event.MaskedURL`) replaces domain hosts with `***`, preserving
+an explicit port. IP hosts, paths and fragments use configured value-regex
+rules, and decoded query values use key-based rules first, then value-regex
+rules. No DNS lookups are performed. It accepts full and relative URLs.
 `MaskQuery` / `MaskedQuery` mask only query parameters, preserving all other
 URL components verbatim. They also accept bare queries such as
 `password=secret&amount=100`. Inputs such as
@@ -131,7 +132,12 @@ URL components verbatim. They also accept bare queries such as
 between a bare query and a relative URL, so `MaskQuery` redacts them entirely
 as `***`. Use a leading `/` for relative URLs, percent-encode `?` inside
 bare-query values, or use `MaskURL` when the input is known to be a URL.
+Domain masking is automatic for `MaskURL` and `mask_url_components`, including
+subdomains, international domain names and single-label hosts like `localhost`.
 IP masking is opt-in; it is not included in `DefaultRules()`.
+
+For example, `https://api.example.com:8443/path?password=secret` becomes
+`https://***:8443/path?password=%2A%2A%2A` with the default parameter rules.
 
 For URL fields inside JSON/XML or `MaskAny`, use `mask_url_components`:
 

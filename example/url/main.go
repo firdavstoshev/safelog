@@ -1,4 +1,4 @@
-// Example: mask an IP host and query parameters together, both directly
+// Example: mask IP/domain hosts and query parameters together, both directly
 // and inside JSON fields configured with mask_url_components.
 //
 // Run with: go run ./example/url
@@ -28,8 +28,9 @@ func main() {
 	log.Info().MaskedURL("url", []byte("http://192.168.1.4:8080/charge?password=secret&amount=100")).
 		Msg("outbound request")
 
-	// The same processing works inside JSON via the URL field strategy.
-	log.Info().MaskedJSON("request", []byte(`{"requestUrl":"http://192.168.1.4:8080/charge?password=secret&amount=100"}`)).
+	// Domain hosts are automatically replaced with ***. The same processing
+	// works inside JSON via the URL field strategy.
+	log.Info().MaskedJSON("request", []byte(`{"requestUrl":"https://api.example.com:8443/charge?password=secret&amount=100"}`)).
 		Msg("request payload")
 
 	// Bare queries also use parameter-name rules, without a leading '?'.

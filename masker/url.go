@@ -1,13 +1,17 @@
 package masker
 
-import "net/url"
+import (
+	"net/netip"
+	"net/url"
+)
 
 // maxURLMaskDepth bounds nested URL parsing and repeated query encoding.
 // Each descent through a URLComponents rule consumes one level.
 const maxURLMaskDepth = 8
 
-// MaskURL masks the host, path and fragment using value-regex rules and the
-// decoded query parameters using key/value rules. URL credentials are replaced
+// MaskURL replaces domain hosts with "***" and masks IP hosts, paths and
+// fragments using value-regex rules. Decoded query parameters use key/value
+// rules. URL credentials are replaced
 // with "***". Invalid URLs are replaced with "***"; invalid queries are replaced
 // in full. Accepts absolute and relative URLs. Nested URLs beyond eight levels
 // are replaced with "***".
@@ -32,7 +36,16 @@ func (m *Masker) maskURLDepth(s string, remaining int) string {
 	if u.Opaque != "" {
 		return "***"
 	}
+	hostname, port := u.Hostname(), u.Port()
 	u.Host = m.applyComponentRules(u.Host)
+	// Classify the original host before regex rules turn an IP into masked text.
+	// Parsing an address is local and does not resolve DNS names.
+	if _, err := netip.ParseAddr(hostname); hostname != "" && err != nil {
+		u.Host = "***"
+		if port != "" {
+			u.Host += ":" + port
+		}
+	}
 	if u.User != nil {
 		u.User = url.User("***")
 	}

@@ -173,3 +173,15 @@ func TestEvent_MaskedQuery_AmbiguousRelativeURL(t *testing.T) {
 		t.Fatalf("ambiguous URL not redacted: %s", buf.String())
 	}
 }
+
+func TestEvent_MaskedURL_DomainAndPassword(t *testing.T) {
+	log, buf := newTestLogger()
+	log.Info().MaskedURL("url", []byte("https://api.example.com:8443/path?password=secret")).Msg("request")
+	var got map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if want := "https://***:8443/path?password=%2A%2A%2A"; got["url"] != want {
+		t.Fatalf("got %q, want %q", got["url"], want)
+	}
+}

@@ -148,8 +148,8 @@ func (e *Event) MaskedQuery(key string, raw []byte) *Event {
 	return e
 }
 
-// MaskedURL masks all components of an absolute or relative URL using the
-// configured host/path/fragment regex rules and query key/value rules.
+// MaskedURL replaces domain hosts with "***" and masks IP hosts, paths and
+// fragments with configured regex rules, and queries with key/value rules.
 func (e *Event) MaskedURL(key string, raw []byte) *Event {
 	e.e = e.e.Str(key, string(e.m.MaskURL(raw)))
 	return e

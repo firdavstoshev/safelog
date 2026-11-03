@@ -22,14 +22,14 @@ func TestMaskURLComponents(t *testing.T) {
 		{"malformed path", "http://192.168.1.4/%ZZ?password=secret", "***"},
 		{"IP query value", "http://192.168.1.4/?peer=10.20.30.40", "http://192.168.x.x/?peer=10.20.x.x"},
 		{"path and fragment", "http://192.168.1.4/peer/10.20.30.40?password=secret#10.20.30.40", "http://192.168.x.x/peer/10.20.x.x?password=%2A%2A%2A#10.20.x.x"},
-		{"encoded path and fragment", "https://api/peer/10%2E20%2E30%2E40#10%2E20%2E30%2E40", "https://api/peer/10.20.x.x#10.20.x.x"},
-		{"unchanged escaping", "https://api/a%2Fb?amount=100#c%2Fd", "https://api/a%2Fb?amount=100#c%2Fd"},
+		{"encoded path and fragment", "https://api/peer/10%2E20%2E30%2E40#10%2E20%2E30%2E40", "https://***/peer/10.20.x.x#10.20.x.x"},
+		{"unchanged escaping", "https://api/a%2Fb?amount=100#c%2Fd", "https://***/a%2Fb?amount=100#c%2Fd"},
 		{"no query", "http://192.168.1.4:8080/charge", "http://192.168.x.x:8080/charge"},
 		{"fragment without path", "http://192.168.1.4?password=secret#section", "http://192.168.x.x?password=%2A%2A%2A#section"},
 		{"credentials", "https://user:secret@192.168.1.4/?password=secret", "https://%2A%2A%2A@192.168.x.x/?password=%2A%2A%2A"},
 		{"malformed query", "http://192.168.1.4/?password=%ZZ&amount=100", "http://192.168.x.x/?***"},
 		{"malformed URL", "http://[bad/charge?password=secret", "***"},
-		{"empty query", "https://api/path?", "https://api/path?"},
+		{"empty query", "https://api/path?", "https://***/path?"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
