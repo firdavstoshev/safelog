@@ -1,0 +1,12 @@
+rules:
+  - name: request_url
+    keys: [requestUrl, callbackUrl]
+    # Also detect URLs inside text, regardless of the payload field name.
+    # Keep this rule before the IP regex so it parses the original IP host.
+    pattern: '\bhttps?://[^\s"''<>]+'
+    strategy: mask_url_components
+
+  - name: ip
+    pattern: '\b(?:\d{1,3}\.){3}\d{1,3}(?::\d{1,5})?\b'
+    strategy: mask_ipv4
+    prefix: 2

@@ -133,3 +133,55 @@ func TestRequestIDFromContext(t *testing.T) {
 		t.Fatalf("want abc, got %q", got)
 	}
 }
+
+func TestEvent_MaskedURL_IPAndPassword(t *testing.T) {
+	var buf bytes.Buffer
+	rules := append(masker.DefaultRules(), masker.Rule{Pattern: masker.IPv4Regex, Mask: masker.MaskIPv4(2)})
+	log := New(&buf, masker.New(rules))
+	log.Info().MaskedURL("url", []byte("http://192.168.1.4:8080/charge?password=secret&amount=100")).Msg("request")
+	var got map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if want := "http://192.168.x.x:8080/charge?amount=100&password=%2A%2A%2A"; got["url"] != want {
+		t.Fatalf("got %q, want %q", got["url"], want)
+	}
+}
+
+func TestEvent_MaskedQuery_PreservesHost(t *testing.T) {
+	var buf bytes.Buffer
+	rules := append(masker.DefaultRules(), masker.Rule{Pattern: masker.IPv4Regex, Mask: masker.MaskIPv4(2)})
+	log := New(&buf, masker.New(rules))
+	log.Info().MaskedQuery("url", []byte("http://192.168.1.4:8080/charge?password=secret")).Msg("request")
+	var got map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if want := "http://192.168.1.4:8080/charge?password=%2A%2A%2A"; got["url"] != want {
+		t.Fatalf("got %q, want %q", got["url"], want)
+	}
+}
+
+func TestEvent_MaskedQuery_AmbiguousRelativeURL(t *testing.T) {
+	log, buf := newTestLogger()
+	log.Info().MaskedQuery("url", []byte("action=pay/path?password=secret")).Msg("request")
+	var got map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got["url"] != "***" {
+		t.Fatalf("ambiguous URL not redacted: %s", buf.String())
+	}
+}
+
+func TestEvent_MaskedURL_DomainAndPassword(t *testing.T) {
+	log, buf := newTestLogger()
+	log.Info().MaskedURL("url", []byte("https://api.example.com:8443/path?password=secret")).Msg("request")
+	var got map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if want := "https://***:8443/path?password=%2A%2A%2A"; got["url"] != want {
+		t.Fatalf("got %q, want %q", got["url"], want)
+	}
+}

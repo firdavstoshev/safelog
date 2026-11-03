@@ -91,6 +91,8 @@ func (rc RuleConfig) compile() (Rule, error) {
 		r.Mask = FingerprintPAN()
 	case "mask_ipv4":
 		r.Mask = MaskIPv4(rc.Prefix)
+	case "mask_url_components":
+		r.URLComponents = true
 	case "mask_url":
 		r.Mask = MaskURL()
 	case "replace":
