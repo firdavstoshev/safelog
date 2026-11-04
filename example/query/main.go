@@ -57,5 +57,4 @@ func main() {
 			MaskedQuery("url", []byte(malformed)).
 			Msg("malformed query preserved")
 	}
-
 }
