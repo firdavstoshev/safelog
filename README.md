@@ -246,6 +246,11 @@ go tool pprof -top masker.test cpu.pprof
 
 ## Known limitations
 
+- **Malformed queries.** `MaskQuery` preserves query text unchanged if
+  parsing fails (for example, invalid percent escapes or unescaped
+  semicolons). No key or value rules apply to the malformed query. When
+  processing a query, URL paths and fragments are preserved unchanged.
+  Raw queries containing `=` work without a leading `?`.
 - **Query parameter order.** `MaskQuery` re-serialises via
   `url.Values.Encode()`, which sorts keys alphabetically. For a human
   reading logs this is harmless; for byte-stable proxying it is not.

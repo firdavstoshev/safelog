@@ -133,3 +133,22 @@ func TestRequestIDFromContext(t *testing.T) {
 		t.Fatalf("want abc, got %q", got)
 	}
 }
+
+func TestEvent_MaskedQuery_PreservesFragment(t *testing.T) {
+	for _, tc := range []struct{ input, want string }{
+		{"?cvv=123#4111111111111111", "?cvv=%2A%2A%2A#4111111111111111"},
+		{"/cards/4111111111111111?cvv=123#4111111111111111", "/cards/4111111111111111?cvv=%2A%2A%2A#4111111111111111"},
+	} {
+		t.Run(tc.input, func(t *testing.T) {
+			log, buf := newTestLogger()
+			log.Info().MaskedQuery("url", []byte(tc.input)).Msg("request")
+			var got map[string]any
+			if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+				t.Fatal(err)
+			}
+			if got["url"] != tc.want {
+				t.Fatalf("got %q, want %q", got["url"], tc.want)
+			}
+		})
+	}
+}

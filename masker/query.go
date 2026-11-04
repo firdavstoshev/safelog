@@ -1,8 +1,8 @@
 package masker
 
 import (
-	"bytes"
 	"net/url"
+	"strings"
 )
 
 // MaskQuery masks a URL query string (or a full URL that contains one).
@@ -11,23 +11,29 @@ import (
 // check is skipped because the key itself already identifies PII).
 // Otherwise the value is passed through value-regex rules.
 //
-// If raw does not contain '?', it is treated as plain text and returned
-// through MaskString — this keeps the function safe to use on arbitrary
-// URL-like strings without the caller needing to know their shape.
-//
-// Parse errors fall back to MaskString as well, so the function never
-// swallows PII silently on malformed input.
+// Inputs without '?' are treated as raw queries when they contain '=';
+// other inputs are masked as plain text. When processing a query, URL paths
+// and fragments are preserved unchanged. If query parsing fails, the query
+// text is also preserved unchanged; no key or value rules are applied to it.
 func (m *Masker) MaskQuery(raw []byte) []byte {
-	q := bytes.IndexByte(raw, '?')
-	if q < 0 {
-		return []byte(m.MaskString(string(raw)))
+	input := string(raw)
+	body, fragment, hasFragment := strings.Cut(input, "#")
+	prefix, query, hasQuery := strings.Cut(body, "?")
+	if !hasQuery {
+		if !strings.Contains(body, "=") {
+			return []byte(m.MaskString(input))
+		}
+		prefix, query = "", body
+	} else {
+		prefix += "?"
 	}
-	prefix := raw[:q+1]
-	query := string(raw[q+1:])
-
+	suffix := ""
+	if hasFragment {
+		suffix = "#" + fragment
+	}
 	values, err := url.ParseQuery(query)
 	if err != nil {
-		return []byte(m.MaskString(string(raw)))
+		return []byte(prefix + query + suffix)
 	}
 
 	for k, vs := range values {
@@ -44,8 +50,9 @@ func (m *Masker) MaskQuery(raw []byte) []byte {
 
 	buf := getBuf()
 	defer putBuf(buf)
-	buf.Write(prefix)
+	buf.WriteString(prefix)
 	buf.WriteString(values.Encode())
+	buf.WriteString(suffix)
 	out := make([]byte, buf.Len())
 	copy(out, buf.Bytes())
 	return out
