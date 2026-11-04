@@ -7,8 +7,8 @@ import (
 
 // MaskQuery masks query parameters in a full/relative URL or a bare query
 // string. All URL components outside the query are preserved verbatim. Query
-// keys are sorted on output. Malformed queries and inputs ambiguous between
-// bare queries and relative URLs are replaced in full with "***".
+// keys are sorted on output. Malformed query text is preserved unchanged.
+// Inputs ambiguous between bare queries and relative URLs are replaced with "***".
 // Plain text without URL/query structure retains the legacy regex fallback.
 func (m *Masker) MaskQuery(raw []byte) []byte {
 	s := string(raw)
@@ -37,7 +37,11 @@ func (m *Masker) MaskQuery(raw []byte) []byte {
 }
 
 func (m *Masker) maskQueryValues(query string) string {
-	return m.maskQueryValuesDepth(query, maxURLMaskDepth)
+	values, err := url.ParseQuery(query)
+	if err != nil {
+		return query
+	}
+	return m.maskParsedQueryValues(values, maxURLMaskDepth)
 }
 
 func (m *Masker) maskQueryValuesDepth(query string, remaining int) string {
@@ -45,6 +49,10 @@ func (m *Masker) maskQueryValuesDepth(query string, remaining int) string {
 	if err != nil {
 		return "***"
 	}
+	return m.maskParsedQueryValues(values, remaining)
+}
+
+func (m *Masker) maskParsedQueryValues(values url.Values, remaining int) string {
 	for k, vs := range values {
 		fn := m.maskByKeyDepth(k, remaining)
 		for i, v := range vs {
