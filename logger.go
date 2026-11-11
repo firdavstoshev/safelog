@@ -31,18 +31,21 @@ import (
 type Logger struct {
 	z zerolog.Logger
 	m atomic.Pointer[masker.Masker]
+
+	callerLevel zerolog.Level // events at or above this level get a caller
+	callerSkip  int           // extra frames skipped for every event
 }
 
 // New builds a Logger that writes to w and masks with m. The underlying
-// zerolog uses RFC3339Nano timestamps and includes the caller for Error
-// level and above.
+// zerolog uses RFC3339Nano timestamps. Error events include the caller;
+// use WithCaller for every level and WithCallerSkip for wrapper functions.
 func New(w io.Writer, m *masker.Masker, opts ...Option) *Logger {
 	if w == nil {
 		w = os.Stdout
 	}
 	zerolog.TimeFieldFormat = time.RFC3339Nano
 	z := zerolog.New(w).With().Timestamp().Logger()
-	l := &Logger{z: z}
+	l := &Logger{z: z, callerLevel: zerolog.ErrorLevel}
 	l.m.Store(m)
 	for _, opt := range opts {
 		opt(l)
@@ -82,10 +85,19 @@ const requestIDKey = "X-Request-ID"
 // Each call reads the current *Masker atomically, so events in flight
 // before a SetMasker swap keep their original rules and events started
 // after use the new ones.
-func (l *Logger) Info() *Event  { return &Event{e: l.z.Info(), m: l.m.Load()} }
-func (l *Logger) Error() *Event { return &Event{e: l.z.Error().Caller(1), m: l.m.Load()} }
-func (l *Logger) Warn() *Event  { return &Event{e: l.z.Warn(), m: l.m.Load()} }
-func (l *Logger) Debug() *Event { return &Event{e: l.z.Debug(), m: l.m.Load()} }
+func (l *Logger) Info() *Event  { return l.newEvent(l.z.Info(), zerolog.InfoLevel) }
+func (l *Logger) Error() *Event { return l.newEvent(l.z.Error(), zerolog.ErrorLevel) }
+func (l *Logger) Warn() *Event  { return l.newEvent(l.z.Warn(), zerolog.WarnLevel) }
+func (l *Logger) Debug() *Event { return l.newEvent(l.z.Debug(), zerolog.DebugLevel) }
+
+func (l *Logger) newEvent(e *zerolog.Event, level zerolog.Level) *Event {
+	return &Event{
+		e:      e,
+		m:      l.m.Load(),
+		caller: level >= l.callerLevel,
+		skip:   l.callerSkip,
+	}
+}
 
 // Event is a zerolog.Event decorated with masking helpers. The masker
 // pointer is captured when the event opens, so a SetMasker swap mid-event
@@ -93,6 +105,9 @@ func (l *Logger) Debug() *Event { return &Event{e: l.z.Debug(), m: l.m.Load()} }
 type Event struct {
 	e *zerolog.Event
 	m *masker.Masker
+
+	caller bool // add file:line of the code that calls Msg or Msgf
+	skip   int  // extra frames to skip when resolving the caller
 }
 
 // WithRequestID attaches X-Request-ID to this event. Project convention:
@@ -162,8 +177,16 @@ func (e *Event) MaskedAny(key string, v any) *Event {
 	return e
 }
 
-// Msg flushes the event. Mirrors zerolog's terminal call.
-func (e *Event) Msg(msg string) { e.e.Msg(msg) }
+// Msg flushes the event. Mirrors zerolog's terminal call. The caller, when
+// enabled, is the line that calls Msg.
+func (e *Event) Msg(msg string) {
+	e.addCaller()
+	e.e.Msg(msg)
+}
 
-// Msgf formats and flushes.
-func (e *Event) Msgf(format string, a ...any) { e.e.Msgf(format, a...) }
+// Msgf formats and flushes. The caller, when enabled, is the line that
+// calls Msgf.
+func (e *Event) Msgf(format string, a ...any) {
+	e.addCaller()
+	e.e.Msgf(format, a...)
+}

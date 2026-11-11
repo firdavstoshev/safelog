@@ -198,6 +198,8 @@ go run ./example/url
 ```go
 safelog.New(w io.Writer, m *masker.Masker, opts ...safelog.Option) *Logger
 safelog.WithHook(hook zerolog.Hook) safelog.Option
+safelog.WithCaller() safelog.Option             // caller on every level
+safelog.WithCallerSkip(n int) safelog.Option    // skip n wrapper frames
 safelog.ContextWithRequestID(ctx context.Context, reqID string) context.Context
 safelog.RequestIDFromContext(ctx context.Context) string
 
@@ -243,6 +245,36 @@ safelog's private request-ID key must register `WithHook(RequestIDHook{})`.
 
 Run the service-owned context key example with `go run ./example/hooks`.
 
+### Caller
+
+Error events include a `caller` field (`file:line`) by default. Use
+`WithCaller()` to add it to every level. The caller is the line that calls
+`Msg` or `Msgf`, and it does not depend on `zerolog.CallerSkipFrameCount`.
+
+If you log through your own wrapper functions, skip their frames so the
+caller points at the code that called the wrapper:
+
+```go
+func Info(msg string) { log.Info().Msg(msg) } // one wrapper layer
+
+log := safelog.New(os.Stdout, m, safelog.WithCaller(), safelog.WithCallerSkip(1))
+```
+
+A helper at a different depth adjusts one event with `CallerSkipFrame`, which
+adds to `WithCallerSkip` (negative values allowed; the result never goes
+below the `Msg` caller):
+
+```go
+// Two wrapper layers: Audit -> writeAudit -> Msg. One extra frame.
+func Audit(msg string)      { writeAudit(msg) }
+func writeAudit(msg string) { log.Info().CallerSkipFrame(1).Msg(msg) }
+```
+
+Hooks that do not add a caller do not affect it. Do not add a caller through
+`WithHook`: hooks run inside zerolog, so `Event.Caller` there points at
+safelog's `Msg` wrapper, and the `caller` key is written twice when safelog
+adds its own.
+
 ### `Event`
 
 ```go
@@ -251,6 +283,7 @@ Run the service-owned context key example with `go run ./example/hooks`.
 (*Event).Str(k, v string)        *Event   // passthrough — no masking
 (*Event).Int(k string, v int)    *Event
 (*Event).Err(err error)          *Event
+(*Event).CallerSkipFrame(n int)  *Event   // extra caller frames, this event only
 (*Event).MaskedJSON(k string, payload []byte) *Event
 (*Event).MaskedXML (k string, payload []byte) *Event
 (*Event).MaskedQuery(k string, raw []byte) *Event   // query parameters only
