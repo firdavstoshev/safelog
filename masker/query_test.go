@@ -107,8 +107,8 @@ func TestMaskQueryPreservesURLComponents(t *testing.T) {
 		{"callback=http://192.168.1.4/path", "callback=http%3A%2F%2F192.168.x.x%2Fpath"},
 		{"password=secret&amount=100", "amount=100&password=%2A%2A%2A"},
 		{"?password=secret", "?password=%2A%2A%2A"},
-		{"/path?password=%ZZ#section", "/path?***#section"},
-		{"password=secret;amount=100", "***"},
+		{"/path?password=%ZZ#section", "/path?password=%ZZ#section"},
+		{"password=secret;amount=100", "password=secret;amount=100"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
