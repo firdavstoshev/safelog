@@ -33,13 +33,13 @@ func main() {
 		Msg("webhook payload")
 
 	// 3. Raw query without '?' — unrelated keys do not prevent key masking.
-	// Output: amount=100&currency=TJS&cvv=%2A%2A%2A&pin=%2A%2A%2A
+	// Output: amount=100&currency=TJS&cvv=***&pin=***
 	log.Info().WithRequestID(reqID).
 		MaskedQuery("query", []byte("amount=100&cvv=123&currency=TJS&pin=4321")).
 		Msg("raw query with unrelated parameters")
 
 	// 4. Repeated and percent-encoded keys — every CVV value is masked.
-	// Output: amount=100&cvv=%2A%2A%2A&cvv=%2A%2A%2A
+	// Output: amount=100&cvv=***&cvv=***
 	log.Info().WithRequestID(reqID).
 		MaskedQuery("query", []byte("c%76v=123&cvv=456&amount=100")).
 		Msg("repeated and encoded query keys")

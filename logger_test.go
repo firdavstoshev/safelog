@@ -143,7 +143,7 @@ func TestEvent_MaskedURL_IPAndPassword(t *testing.T) {
 	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
-	if want := "http://192.168.x.x:8080/charge?amount=100&password=%2A%2A%2A"; got["url"] != want {
+	if want := "http://192.168.x.x:8080/charge?amount=100&password=***"; got["url"] != want {
 		t.Fatalf("got %q, want %q", got["url"], want)
 	}
 }
@@ -157,7 +157,7 @@ func TestEvent_MaskedQuery_PreservesHost(t *testing.T) {
 	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
-	if want := "http://192.168.1.4:8080/charge?password=%2A%2A%2A"; got["url"] != want {
+	if want := "http://192.168.1.4:8080/charge?password=***"; got["url"] != want {
 		t.Fatalf("got %q, want %q", got["url"], want)
 	}
 }
@@ -181,15 +181,15 @@ func TestEvent_MaskedURL_DomainAndPassword(t *testing.T) {
 	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
-	if want := "https://***:8443/path?password=%2A%2A%2A"; got["url"] != want {
+	if want := "https://***:8443/path?password=***"; got["url"] != want {
 		t.Fatalf("got %q, want %q", got["url"], want)
 	}
 }
 
 func TestEvent_MaskedQuery_PreservesFragment(t *testing.T) {
 	for _, tc := range []struct{ input, want string }{
-		{"?cvv=123#4111111111111111", "?cvv=%2A%2A%2A#4111111111111111"},
-		{"/cards/4111111111111111?cvv=123#4111111111111111", "/cards/4111111111111111?cvv=%2A%2A%2A#4111111111111111"},
+		{"?cvv=123#4111111111111111", "?cvv=***#4111111111111111"},
+		{"/cards/4111111111111111?cvv=123#4111111111111111", "/cards/4111111111111111?cvv=***#4111111111111111"},
 	} {
 		t.Run(tc.input, func(t *testing.T) {
 			log, buf := newTestLogger()

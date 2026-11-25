@@ -137,7 +137,7 @@ subdomains, international domain names and single-label hosts like `localhost`.
 IP masking is opt-in; it is not included in `DefaultRules()`.
 
 For example, `https://api.example.com:8443/path?password=secret` becomes
-`https://***:8443/path?password=%2A%2A%2A` with the default parameter rules.
+`https://***:8443/path?password=***` with the default parameter rules.
 
 For URL fields inside JSON/XML or `MaskAny`, use `mask_url_components`:
 
@@ -162,10 +162,10 @@ transform:
 
 ```text
 http://192.168.1.4:8080/charge?password=secret&amount=100
-→ http://192.168.x.x:8080/charge?amount=100&password=%2A%2A%2A
+→ http://192.168.x.x:8080/charge?amount=100&password=***
 ```
 
-`%2A` is an encoded `*`. URL credentials are replaced with `***`.
+Masked stars stay literal (`***`, not `%2A%2A%2A`). URL credentials are replaced with `***`.
 `MaskURL` / `MaskedURL` replace malformed URLs with `***` and replace
 malformed queries in full while retaining the masked URL's other components.
 `MaskQuery` / `MaskedQuery` instead preserve malformed query text unchanged.

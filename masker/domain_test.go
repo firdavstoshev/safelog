@@ -10,16 +10,17 @@ import (
 func TestMaskURLDomainHost(t *testing.T) {
 	m := newDefault()
 	tests := []struct{ input, want string }{
-		{"https://api.example.com/path?password=secret", "https://***/path?password=%2A%2A%2A"},
+		{"https://api.example.com/path?password=secret", "https://***/path?password=***"},
 		{"https://api.example.com:8443/a%2Fb?amount=100#c%2Fd", "https://***:8443/a%2Fb?amount=100#c%2Fd"},
 		{"https://API.Example.COM./", "https://***/"},
 		{"https://xn--bcher-kva.example/", "https://***/"},
 		{"https://bücher.example/", "https://***/"},
 		{"http://localhost:8080/", "http://***:8080/"},
-		{"//api.example.com/path?password=secret", "//***/path?password=%2A%2A%2A"},
-		{"https://user:secret@api.example.com/path", "https://%2A%2A%2A@***/path"},
+		{"//api.example.com/path?password=secret", "//***/path?password=***"},
+		{"https://user:secret@api.example.com/path", "https://***@***/path"},
 		{"https://api.example.com", "https://***"},
-		{"/path?password=secret", "/path?password=%2A%2A%2A"},
+		{"https://api.example.com/cards/4111111111111111?pan=4111111111111111", "https://***/cards/4111********1111?pan=4111********1111"},
+		{"/path?password=secret", "/path?password=***"},
 		{"http://192.168.1.4:8080/", "http://192.168.1.4:8080/"},
 		{"http://[2001:db8::1]:8080/", "http://[2001:db8::1]:8080/"},
 	}
@@ -43,7 +44,7 @@ func TestDomainURLFieldAndNestedCallback(t *testing.T) {
 	}
 	m := New(append(DefaultRules(), rules...))
 	input := "https://api.example.com/path?password=secret"
-	want := "https://***/path?password=%2A%2A%2A"
+	want := "https://***/path?password=***"
 	payload, _ := json.Marshal(map[string]string{"requestUrl": input})
 	var got map[string]string
 	if err := json.Unmarshal(m.MaskJSON(payload), &got); err != nil {

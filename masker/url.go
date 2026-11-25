@@ -3,6 +3,7 @@ package masker
 import (
 	"net/netip"
 	"net/url"
+	"strings"
 )
 
 // maxURLMaskDepth bounds nested URL parsing and repeated query encoding.
@@ -50,7 +51,9 @@ func (m *Masker) maskURLDepth(s string, remaining int) string {
 		u.User = url.User("***")
 	}
 	if path := m.applyComponentRules(u.Path); path != u.Path {
-		u.Path, u.RawPath = path, ""
+		// '*' is a valid path character; keep masked stars literal.
+		escaped := (&url.URL{Path: path}).EscapedPath()
+		u.Path, u.RawPath = path, strings.ReplaceAll(escaped, "%2A", "*")
 	}
 	if fragment := m.applyComponentRules(u.Fragment); fragment != u.Fragment {
 		u.Fragment, u.RawFragment = fragment, ""
@@ -58,5 +61,10 @@ func (m *Masker) maskURLDepth(s string, remaining int) string {
 	if u.RawQuery != "" {
 		u.RawQuery = m.maskQueryValuesDepth(u.RawQuery, remaining-1)
 	}
-	return u.String()
+	out := u.String()
+	if u.User != nil {
+		// url.User escapes '*'; the authority is the first "//" in the output.
+		out = strings.Replace(out, "//%2A%2A%2A@", "//***@", 1)
+	}
+	return out
 }

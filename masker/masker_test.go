@@ -134,11 +134,10 @@ func TestMaskJSON_BoolAndNull(t *testing.T) {
 func TestMaskQuery_PathAndParams(t *testing.T) {
 	in := []byte("/charge?pan=5058600012346210&cvv=123&amount=100")
 	got := string(newDefault().MaskQuery(in))
-	if !strings.Contains(got, "pan=5058%2A%2A%2A%2A%2A%2A%2A%2A6210") &&
-		!strings.Contains(got, "pan=5058********6210") {
+	if !strings.Contains(got, "pan=5058********6210") {
 		t.Fatalf("pan not masked: %s", got)
 	}
-	if !strings.Contains(got, "cvv=%2A%2A%2A") && !strings.Contains(got, "cvv=***") {
+	if !strings.Contains(got, "cvv=***") {
 		t.Fatalf("cvv not masked: %s", got)
 	}
 	if !strings.Contains(got, "amount=100") {
@@ -273,9 +272,9 @@ func TestMaskIPv4(t *testing.T) {
 func TestMaskURL(t *testing.T) {
 	cases := map[string]string{
 		"https://api.bank.ru/v2/clients/12345?token=abc": "https://api.bank.ru/***",
-		"http://localhost:8080/foo?bar=1":               "http://localhost:8080/***",
-		"https://api.bank.ru":                           "https://api.bank.ru",
-		"not-a-url":                                     "***",
+		"http://localhost:8080/foo?bar=1":                "http://localhost:8080/***",
+		"https://api.bank.ru":                            "https://api.bank.ru",
+		"not-a-url":                                      "***",
 	}
 	for in, want := range cases {
 		if got := MaskURL()(in); got != want {

@@ -21,7 +21,7 @@ func TestMaskQueryBareValueContainingURLDelimiters(t *testing.T) {
 	}
 	// A relative URL can contain '=' in its query; it is not a bare query.
 	input := "charge?password=secret#section"
-	if got := string(m.MaskQuery([]byte(input))); got != "charge?password=%2A%2A%2A#section" {
+	if got := string(m.MaskQuery([]byte(input))); got != "charge?password=***#section" {
 		t.Fatal(got)
 	}
 }
@@ -110,12 +110,12 @@ func TestMaskQueryAmbiguousRelativeURL(t *testing.T) {
 	}
 	// A leading slash disambiguates the URL and preserves its path.
 	input := "/action=pay/path?password=secret"
-	if got := string(m.MaskQuery([]byte(input))); got != "/action=pay/path?password=%2A%2A%2A" {
+	if got := string(m.MaskQuery([]byte(input))); got != "/action=pay/path?password=***" {
 		t.Fatal(got)
 	}
 	// Encoding the delimiter disambiguates a bare query value.
 	input = "action=pay%2Fpath%3Fnext%3D1&password=secret"
-	if got := string(m.MaskQuery([]byte(input))); got != "action=pay%2Fpath%3Fnext%3D1&password=%2A%2A%2A" {
+	if got := string(m.MaskQuery([]byte(input))); got != "action=pay%2Fpath%3Fnext%3D1&password=***" {
 		t.Fatal(got)
 	}
 }
