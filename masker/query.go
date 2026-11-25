@@ -63,5 +63,13 @@ func (m *Masker) maskParsedQueryValues(values url.Values, remaining int) string 
 			}
 		}
 	}
-	return values.Encode()
+	return encodeQuery(values)
+}
+
+// encodeQuery is url.Values.Encode with '*' left literal, so masked values
+// read as "***" in logs instead of "%2A%2A%2A". '*' is a valid query
+// character and decodes identically. Every '%' in Encode output starts an
+// escape triple, so "%2A" only ever stands for an encoded '*'.
+func encodeQuery(values url.Values) string {
+	return strings.ReplaceAll(values.Encode(), "%2A", "*")
 }

@@ -14,19 +14,19 @@ func urlTestMasker() *Masker {
 func TestMaskURLComponents(t *testing.T) {
 	m := urlTestMasker()
 	tests := []struct{ name, input, want string }{
-		{"full URL", "http://192.168.1.4:8080/charge?password=secret&amount=100", "http://192.168.x.x:8080/charge?amount=100&password=%2A%2A%2A"},
-		{"leading question", "?password=secret", "?password=%2A%2A%2A"},
-		{"encoded key and repeated values", "/charge?pass%77ord=one&password=two&amount=100", "/charge?amount=100&password=%2A%2A%2A&password=%2A%2A%2A"},
-		{"encoded unknown value", "/charge?note=ivanov%40example.com", "/charge?note=i%2A%2A%2A%2A%2A%40example.com"},
-		{"IPv6 host retained without IPv6 rule", "http://[2001:db8::1]:8080/?password=secret", "http://[2001:db8::1]:8080/?password=%2A%2A%2A"},
+		{"full URL", "http://192.168.1.4:8080/charge?password=secret&amount=100", "http://192.168.x.x:8080/charge?amount=100&password=***"},
+		{"leading question", "?password=secret", "?password=***"},
+		{"encoded key and repeated values", "/charge?pass%77ord=one&password=two&amount=100", "/charge?amount=100&password=***&password=***"},
+		{"encoded unknown value", "/charge?note=ivanov%40example.com", "/charge?note=i*****%40example.com"},
+		{"IPv6 host retained without IPv6 rule", "http://[2001:db8::1]:8080/?password=secret", "http://[2001:db8::1]:8080/?password=***"},
 		{"malformed path", "http://192.168.1.4/%ZZ?password=secret", "***"},
 		{"IP query value", "http://192.168.1.4/?peer=10.20.30.40", "http://192.168.x.x/?peer=10.20.x.x"},
-		{"path and fragment", "http://192.168.1.4/peer/10.20.30.40?password=secret#10.20.30.40", "http://192.168.x.x/peer/10.20.x.x?password=%2A%2A%2A#10.20.x.x"},
+		{"path and fragment", "http://192.168.1.4/peer/10.20.30.40?password=secret#10.20.30.40", "http://192.168.x.x/peer/10.20.x.x?password=***#10.20.x.x"},
 		{"encoded path and fragment", "https://api/peer/10%2E20%2E30%2E40#10%2E20%2E30%2E40", "https://***/peer/10.20.x.x#10.20.x.x"},
 		{"unchanged escaping", "https://api/a%2Fb?amount=100#c%2Fd", "https://***/a%2Fb?amount=100#c%2Fd"},
 		{"no query", "http://192.168.1.4:8080/charge", "http://192.168.x.x:8080/charge"},
-		{"fragment without path", "http://192.168.1.4?password=secret#section", "http://192.168.x.x?password=%2A%2A%2A#section"},
-		{"credentials", "https://user:secret@192.168.1.4/?password=secret", "https://%2A%2A%2A@192.168.x.x/?password=%2A%2A%2A"},
+		{"fragment without path", "http://192.168.1.4?password=secret#section", "http://192.168.x.x?password=***#section"},
+		{"credentials", "https://user:secret@192.168.1.4/?password=secret", "https://***@192.168.x.x/?password=***"},
 		{"malformed query", "http://192.168.1.4/?password=%ZZ&amount=100", "http://192.168.x.x/?***"},
 		{"malformed URL", "http://[bad/charge?password=secret", "***"},
 		{"empty query", "https://api/path?", "https://***/path?"},
@@ -59,7 +59,7 @@ func TestURLComponentsStrategy(t *testing.T) {
 	}
 	m := New(rules)
 	input := "http://192.168.1.4/path?password=secret&peer=10.20.30.40"
-	want := "http://192.168.x.x/path?password=%2A%2A%2A&peer=10.20.x.x"
+	want := "http://192.168.x.x/path?password=***&peer=10.20.x.x"
 	var decoded map[string]string
 	payload, _ := json.Marshal(map[string]string{"requestUrl": input})
 	if err := json.Unmarshal(m.MaskJSON(payload), &decoded); err != nil {
@@ -88,7 +88,7 @@ func TestURLComponentsGoRuleAndNestedURL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := "http://10.20.x.x/?password=%2A%2A%2A"; u.Query().Get("callback") != want {
+	if want := "http://10.20.x.x/?password=***"; u.Query().Get("callback") != want {
 		t.Fatalf("nested URL: %s", got)
 	}
 	if strings.Contains(got, "192.168.1.4") {
@@ -99,14 +99,14 @@ func TestURLComponentsGoRuleAndNestedURL(t *testing.T) {
 func TestMaskQueryPreservesURLComponents(t *testing.T) {
 	m := urlTestMasker()
 	tests := []struct{ input, want string }{
-		{"http://192.168.1.4:8080/10.20.30.40?password=secret&peer=10.20.30.40#10.20.30.40", "http://192.168.1.4:8080/10.20.30.40?password=%2A%2A%2A&peer=10.20.x.x#10.20.30.40"},
-		{"https://user:secret@192.168.1.4/a%2Fb?password=secret#c%2Fd", "https://user:secret@192.168.1.4/a%2Fb?password=%2A%2A%2A#c%2Fd"},
+		{"http://192.168.1.4:8080/10.20.30.40?password=secret&peer=10.20.30.40#10.20.30.40", "http://192.168.1.4:8080/10.20.30.40?password=***&peer=10.20.x.x#10.20.30.40"},
+		{"https://user:secret@192.168.1.4/a%2Fb?password=secret#c%2Fd", "https://user:secret@192.168.1.4/a%2Fb?password=***#c%2Fd"},
 		{"http://192.168.1.4/path#fragment?password=secret", "http://192.168.1.4/path#fragment?password=secret"},
 		{"http://192.168.1.4/path", "http://192.168.1.4/path"},
 		{"relative/10.20.30.40#10.20.30.40", "relative/10.20.30.40#10.20.30.40"},
 		{"callback=http://192.168.1.4/path", "callback=http%3A%2F%2F192.168.x.x%2Fpath"},
-		{"password=secret&amount=100", "amount=100&password=%2A%2A%2A"},
-		{"?password=secret", "?password=%2A%2A%2A"},
+		{"password=secret&amount=100", "amount=100&password=***"},
+		{"?password=secret", "?password=***"},
 		{"/path?password=%ZZ#section", "/path?password=%ZZ#section"},
 		{"password=secret;amount=100", "password=secret;amount=100"},
 	}
